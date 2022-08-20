@@ -45,17 +45,40 @@ void Net::createClient(const char* addr, const char* port)
     }
     printf("socket() succeed\n");
 
-    result = bind(m_clientSocket, res->ai_addr, res->ai_addrlen);
-    if(result == SOCKET_ERROR) {
-        printf("bind failed with error: %d\n", result);
-        freeaddrinfo(res);
-        closesocket(m_clientSocket);
-        WSACleanup();
-        return;
-    }
-    printf("bind succeed\n");
-    
-    freeaddrinfo(res);
+    //result = bind(m_clientSocket, ptr->ai_addr, ptr->ai_addrlen);
+    //if(result == SOCKET_ERROR) {
+    //    printf("bind failed with error: %d\n", result);
+    //    freeaddrinfo(res);
+    //    closesocket(m_clientSocket);
+    //    WSACleanup();
+    //    return;
+    //}
+    //printf("bind succeed\n");
+
+	result = connect(m_clientSocket, ptr->ai_addr, ptr->ai_addrlen);
+	if (result == SOCKET_ERROR) {
+		closesocket(m_clientSocket);
+		m_clientSocket = INVALID_SOCKET;
+	}
+
+	freeaddrinfo(res);
+
+	if (m_clientSocket == INVALID_SOCKET) {
+		printf("unable to connect to server!\n");
+		WSACleanup();
+		return;
+	}
+	printf("connect succeed\n");
+
+	std::string str("nihaoa, i'm czy!");
+	result = send(m_clientSocket, str.data(), str.size(), 0);
+	if (result == SOCKET_ERROR) {
+		printf("send failed: %d\n", WSAGetLastError());
+		closesocket(m_clientSocket);
+		WSACleanup();
+		return;
+	}
+	printf("Bytes sent: %ld\n", result);
 }
 
 void Net::createServer(std::string& addr, std::string& port)
@@ -106,4 +129,33 @@ void Net::createServer(std::string& addr, std::string& port)
         return;
     }
     printf("listen succeed\n");
+
+	m_clientSocket = accept(m_serverSocket, nullptr, nullptr);
+	if (m_clientSocket == INVALID_SOCKET) {
+		printf("accept failed: %d\n", WSAGetLastError());
+		closesocket(m_serverSocket);
+		WSACleanup();
+		return;
+	}
+	printf("accept succeed\n");
+
+#define DEFAULT_BUFLEN 512
+
+	char recvBuf[DEFAULT_BUFLEN];
+	do {
+		memset(recvBuf, 0, DEFAULT_BUFLEN);
+		result = recv(m_clientSocket, recvBuf, DEFAULT_BUFLEN, 0);
+		if (result > 0) {
+			printf("Bytes received: %d: %s\n", result, recvBuf);
+		}
+		else if (result == 0) {
+			printf("Connection closing...\n");
+		}
+		else {
+			printf("recv failed: %d\n", WSAGetLastError());
+			closesocket(m_clientSocket);
+			WSACleanup();
+			return;
+		}
+	} while (result > 0);
 }
